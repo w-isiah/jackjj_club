@@ -1,18 +1,25 @@
+# apps/accounts/context_processors.py
+
 from django.db import connection
 
 def user_context(request):
     """
-    Makes logged-in user info available in all templates.
+    Makes logged-in user info from the custom `users` table
+    available in all templates as `current_user`.
     """
     user_data = None
-
     user_id = request.session.get("user_id")
+
     if user_id:
         with connection.cursor() as cursor:
-            cursor.execute("""
-                SELECT id, username, email, first_name, last_name, date_joined
-                FROM users WHERE id = %s
-            """, [user_id])
+            cursor.execute(
+                """
+                SELECT id, username, email, first_name, last_name, is_active, is_staff, date_joined
+                FROM users
+                WHERE id = %s
+                """,
+                [user_id]
+            )
             row = cursor.fetchone()
             if row:
                 user_data = {
@@ -21,7 +28,9 @@ def user_context(request):
                     "email": row[2],
                     "first_name": row[3],
                     "last_name": row[4],
-                    "date_joined": row[5],
+                    "is_active": bool(row[5]),
+                    "is_staff": bool(row[6]),
+                    "date_joined": row[7],
                 }
 
     return {"current_user": user_data}

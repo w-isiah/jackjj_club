@@ -1,27 +1,19 @@
-# apps/accounts/views.py
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.hashers import make_password, check_password
-from supabase import create_client, Client
-import os
-
-# -------------------------
-# Supabase client
-# -------------------------
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+from django.db import connection
 
 # -------------------------
 # Custom login_required decorator
 # -------------------------
 def login_required_custom(view_func):
-    """Protect views for logged-in users."""
     def wrapper(request, *args, **kwargs):
-        if 'user_id' not in request.session:
-            return redirect('login')
+        if not request.session.get("user_id"):
+            messages.error(request, "Please log in first.")
+            return redirect("login")
         return view_func(request, *args, **kwargs)
     return wrapper
+
 
 # -------------------------
 # Login view
@@ -31,29 +23,37 @@ def login_view(request):
         username = request.POST.get("username")
         password = request.POST.get("password")
 
-        response = supabase.table("users").select("*").eq("username", username).execute()
-        user = response.data[0] if response.data else None
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT id, username, password, is_staff FROM users WHERE username=%s",
+                [username]
+            )
+            row = cursor.fetchone()
 
-        if user and check_password(password, user['password']):
-            request.session['user_id'] = user['id']
-            request.session['username'] = user['username']
-            request.session['is_staff'] = user.get('is_staff', False)
-            return redirect('dashboard')
+        if row and check_password(password, row[2]):
+            user_id, username, _, is_staff = row
+            request.session["user_id"] = user_id
+            request.session["username"] = username
+            request.session["is_staff"] = bool(is_staff)
+            messages.success(request, f"Welcome back, {username}!")
+            return redirect("dashboard")
         else:
-            messages.error(request, "Invalid username or password")
+            messages.error(request, "Invalid username or password.")
 
     return render(request, "accounts/login.html")
+
 
 # -------------------------
 # Logout view
 # -------------------------
 def logout_view(request):
     request.session.flush()
-    messages.success(request, "You have successfully logged out.")
-    return redirect('login')
+    messages.success(request, "Logged out successfully.")
+    return redirect("login")
+
 
 # -------------------------
-# Register / Signup view
+# Register view
 # -------------------------
 def register_view(request):
     if request.method == "POST":
@@ -65,37 +65,35 @@ def register_view(request):
         last_name = request.POST.get("last_name", "")
 
         if password != confirm_password:
-            messages.error(request, "Passwords do not match")
-            return redirect('register')
+            messages.error(request, "Passwords do not match.")
+            return redirect("register")
 
-        # Check if username or email exists
-        existing = supabase.table("users").select("*").or_(f"username.eq.{username},email.eq.{email}").execute()
-        if existing.data:
-            messages.error(request, "Username or email already exists")
-            return redirect('register')
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT id FROM users WHERE username=%s OR email=%s", [username, email])
+            if cursor.fetchone():
+                messages.error(request, "Username or email already exists.")
+                return redirect("register")
 
-        hashed_password = make_password(password)
-        supabase.table("users").insert({
-            "username": username,
-            "email": email,
-            "password": hashed_password,
-            "first_name": first_name,
-            "last_name": last_name,
-            "is_active": True
-        }).execute()
+            hashed_password = make_password(password)
+            cursor.execute(
+                "INSERT INTO users (username, email, password, first_name, last_name, is_active) "
+                "VALUES (%s, %s, %s, %s, %s, %s)",
+                [username, email, hashed_password, first_name, last_name, True]
+            )
 
         messages.success(request, "Account created successfully! Please log in.")
-        return redirect('login')
+        return redirect("login")
 
     return render(request, "accounts/register.html")
+
 
 # -------------------------
 # Dashboard view
 # -------------------------
 @login_required_custom
 def dashboard(request):
-    
-    return redirect( "index")
+    return redirect("index")
+
 
 # -------------------------
 # Profile view
@@ -103,13 +101,25 @@ def dashboard(request):
 @login_required_custom
 def account_profile(request):
     user_id = request.session.get("user_id")
-    response = supabase.table("users").select("*").eq("id", user_id).execute()
-    user_data = response.data[0] if response.data else None
 
-    if not user_data:
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT id, username, email, first_name, last_name, is_staff FROM users WHERE id=%s",
+            [user_id]
+        )
+        row = cursor.fetchone()
+
+    if not row:
+        messages.error(request, "User not found.")
         return redirect("login")
 
-    context = {
-        "user": user_data
+    user_data = {
+        "id": row[0],
+        "username": row[1],
+        "email": row[2],
+        "first_name": row[3],
+        "last_name": row[4],
+        "is_staff": row[5],
     }
-    return render(request, "accounts/profile.html", context)
+
+    return render(request, "accounts/profile.html", {"user": user_data})
