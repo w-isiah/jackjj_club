@@ -1,0 +1,65 @@
+{% extends "layouts/base.html" %}
+{% load static %}
+
+{% block title %}All Users | Jack JJ Club{% endblock title %}
+
+{% block content %}
+<div class="content-wrapper">
+  <section class="content-header">
+    <h1>All Users</h1>
+  </section>
+
+  <section class="content">
+    <div class="card">
+      <div class="card-body table-responsive">
+        <table class="table table-bordered table-hover">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Avatar</th>
+              <th>Username</th>
+              <th>Email</th>
+              <th>Name</th>
+              <th>Phone</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Joined</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for user in users %}
+            <tr>
+              <td>{{ forloop.counter }}</td>
+              <td>
+                {% if user.avatar %}
+                  <img src="{{ MEDIA_URL }}{{ user.avatar }}" width="50" class="img-circle">
+                {% else %}
+                  <img src="{% static 'dist/img/user2-160x160.jpg' %}" width="50" class="img-circle">
+                {% endif %}
+              </td>
+              <td>{{ user.username }}</td>
+              <td>{{ user.email }}</td>
+              <td>{{ user.first_name }} {{ user.last_name }}</td>
+              <td>{{ user.phone|default:"-" }}</td>
+              <td>{{ user.role|default:"Member" }}</td>
+              <td>
+                {% if user.is_active %}
+                  <span class="badge badge-success">Active</span>
+                {% else %}
+                  <span class="badge badge-danger">Inactive</span>
+                {% endif %}
+              </td>
+              <td>{{ user.date_joined|date:"M d, Y" }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="9" class="text-center">No users found.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</div>
+{% endblock content %}

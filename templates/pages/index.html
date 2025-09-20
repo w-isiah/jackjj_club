@@ -4,13 +4,13 @@
 {% block title %}Investment Club | Dashboard{% endblock title %}
 
 {% block extrastyle %}
-  <!-- Ionicons -->
-  <link rel="stylesheet" href="https://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css">
-  <link rel="stylesheet" href="{% static 'plugins/tempusdominus-bootstrap-4/css/tempusdominus-bootstrap-4.min.css' %}">
-  <link rel="stylesheet" href="{% static 'plugins/icheck-bootstrap/icheck-bootstrap.min.css' %}">
-  <link rel="stylesheet" href="{% static 'plugins/jqvmap/jqvmap.min.css' %}">
-  <link rel="stylesheet" href="{% static 'plugins/daterangepicker/daterangepicker.css' %}">
-  <link rel="stylesheet" href="{% static 'plugins/summernote/summernote-bs4.min.css' %}">
+<!-- Ionicons -->
+<link rel="stylesheet" href="https://code.ionicframework.com/ionicons/2.0.1/css/ionicons.min.css">
+<link rel="stylesheet" href="{% static 'plugins/tempusdominus-bootstrap-4/css/tempusdominus-bootstrap-4.min.css' %}">
+<link rel="stylesheet" href="{% static 'plugins/icheck-bootstrap/icheck-bootstrap.min.css' %}">
+<link rel="stylesheet" href="{% static 'plugins/jqvmap/jqvmap.min.css' %}">
+<link rel="stylesheet" href="{% static 'plugins/daterangepicker/daterangepicker.css' %}">
+<link rel="stylesheet" href="{% static 'plugins/summernote/summernote-bs4.min.css' %}">
 {% endblock extrastyle %}
 
 {% block bodyclass %}hold-transition sidebar-mini layout-fixed{% endblock bodyclass %}
@@ -53,13 +53,26 @@
         <div class="col-lg-3 col-6">
           <div class="small-box bg-success">
             <div class="inner">
-              <h3>${{ total_invested }}</h3>
+              <h3>UGX{{ total_invested }}</h3>
               <p>Total Investments</p>
             </div>
             <div class="icon"><i class="ion ion-cash"></i></div>
             <a href="#" class="small-box-footer">More info <i class="fas fa-arrow-circle-right"></i></a>
           </div>
         </div>
+
+        {% if current_user.role == "admin" %}
+        <div class="col-lg-3 col-6">
+          <div class="small-box bg-primary">
+            <div class="inner">
+              <h3>User Accounts</h3>
+              <p>Users</p>
+            </div>
+            <div class="icon"><i class="ion ion-person-add"></i></div>
+            <a href="{% url 'users_list' %} " class="small-box-footer">More info <i class="fas fa-arrow-circle-right"></i></a>
+          </div>
+        </div>
+        {% endif %}
 
         <div class="col-lg-3 col-6">
           <div class="small-box bg-warning">
@@ -83,7 +96,6 @@
           </div>
         </div>
       </div>
-      <!-- /.row -->
 
       <!-- Recent Transactions -->
       <div class="row">
@@ -109,11 +121,13 @@
                     <td>{{ forloop.counter }}</td>
                     <td>{{ txn.member_name }}</td>
                     <td>{{ txn.type }}</td>
-                    <td>${{ txn.amount }}</td>
+                    <td>UGX{{ txn.amount }}</td>
                     <td>{{ txn.date|date:"M d, Y" }}</td>
                   </tr>
                   {% empty %}
-                  <tr><td colspan="5" class="text-center">No transactions found</td></tr>
+                  <tr>
+                    <td colspan="5" class="text-center">No transactions found</td>
+                  </tr>
                   {% endfor %}
                 </tbody>
               </table>

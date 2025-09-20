@@ -2,6 +2,16 @@ from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.contrib.auth.hashers import make_password, check_password
 from django.db import connection
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.db import connection
+from django.contrib.auth.decorators import login_required
+import os
+from django.conf import settings
+from django.shortcuts import redirect, render
+#from apps.accounts.decorators import login_required_custom  # adjust import if needed
+
+
 
 # -------------------------
 # Custom login_required decorator
@@ -16,6 +26,8 @@ def login_required_custom(view_func):
 
 
 # -------------------------
+
+# -------------------------
 # Login view
 # -------------------------
 def login_view(request):
@@ -23,24 +35,36 @@ def login_view(request):
         username = request.POST.get("username")
         password = request.POST.get("password")
 
+        # Fetch user from custom table
         with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT id, username, password, is_staff FROM users WHERE username=%s",
-                [username]
-            )
+            cursor.execute("""
+                SELECT id, username, password, is_staff, avatar, role
+                FROM users
+                WHERE username = %s
+            """, [username])
             row = cursor.fetchone()
 
-        if row and check_password(password, row[2]):
-            user_id, username, _, is_staff = row
-            request.session["user_id"] = user_id
-            request.session["username"] = username
-            request.session["is_staff"] = bool(is_staff)
-            messages.success(request, f"Welcome back, {username}!")
-            return redirect("dashboard")
-        else:
-            messages.error(request, "Invalid username or password.")
+        if row:
+            user_id, username_db, hashed_password, is_staff, avatar, role = row
+
+            # Check password
+            if check_password(password, hashed_password):
+                # Set session variables including role
+                request.session["user_id"] = user_id
+                request.session["username"] = username_db
+                request.session["avatar"] = avatar
+                request.session["role"] = role
+                request.session["is_staff"] = bool(is_staff)
+
+                messages.success(request, f"Welcome back, {username_db}!")
+                return redirect("index")
+
+        # Invalid credentials
+        messages.error(request, "Invalid username or password.")
 
     return render(request, "accounts/login.html")
+
+
 
 
 # -------------------------
@@ -104,7 +128,12 @@ def account_profile(request):
 
     with connection.cursor() as cursor:
         cursor.execute(
-            "SELECT id, username, email, first_name, last_name, is_staff FROM users WHERE id=%s",
+            """
+            SELECT id, username, email, first_name, last_name, is_staff,
+                   date_joined, phone, avatar
+            FROM users
+            WHERE id = %s
+            """,
             [user_id]
         )
         row = cursor.fetchone()
@@ -120,6 +149,123 @@ def account_profile(request):
         "first_name": row[3],
         "last_name": row[4],
         "is_staff": row[5],
+        "date_joined": row[6],
+        "phone": row[7],
+        "avatar": row[8],  # <-- fixed index
     }
 
     return render(request, "accounts/profile.html", {"user": user_data})
+
+
+
+
+
+
+@login_required_custom
+def edit_profile(request):
+    user_id = request.session.get("user_id")
+    if not user_id:
+        messages.error(request, "You must be logged in to edit your profile.")
+        return redirect("login")
+
+    if request.method == "POST":
+        username = request.POST.get("username")
+        email = request.POST.get("email")
+        first_name = request.POST.get("first_name")
+        last_name = request.POST.get("last_name")
+        phone = request.POST.get("phone")
+        role = request.POST.get("role")
+        avatar = request.FILES.get("avatar")  # Handle file upload
+
+        avatar_path = None
+        if avatar:
+            # Ensure avatars directory exists
+            avatar_dir = os.path.join(settings.MEDIA_ROOT, "avatars")
+            os.makedirs(avatar_dir, exist_ok=True)
+
+            # Save file with unique name
+            avatar_path = f"avatars/{user_id}_{avatar.name}"
+            full_path = os.path.join(settings.MEDIA_ROOT, avatar_path)
+
+            with open(full_path, "wb+") as dest:
+                for chunk in avatar.chunks():
+                    dest.write(chunk)
+
+        # Build query
+        avatar_sql = ""
+        params = [username, email, first_name, last_name, phone, role]
+        if avatar_path:
+            avatar_sql = ", avatar = %s"
+            params.append(avatar_path)
+        params.append(user_id)
+
+        query = f"""
+            UPDATE users
+            SET username = %s, email = %s, first_name = %s, last_name = %s,
+                phone = %s, role = %s {avatar_sql}
+            WHERE id = %s
+        """
+
+        with connection.cursor() as cursor:
+            cursor.execute(query, params)
+
+        messages.success(request, "Profile updated successfully!")
+        return redirect("index")  # 👈 change this to your correct profile page name
+
+    # --- GET request: fetch current user ---
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT id, username, email, first_name, last_name, phone, role, avatar
+            FROM users WHERE id = %s
+        """, [user_id])
+        row = cursor.fetchone()
+
+    user_data = {
+        "id": row[0],
+        "username": row[1],
+        "email": row[2],
+        "first_name": row[3],
+        "last_name": row[4],
+        "phone": row[5],
+        "role": row[6],
+        "avatar": row[7],
+    }
+
+    return render(request, "accounts/edit_profile.html", {"user": user_data})
+
+
+
+
+
+
+# apps/accounts/views.py
+
+@login_required_custom
+def list_users(request):
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT id, username, email, first_name, last_name, phone, avatar, role, is_active, is_staff, date_joined
+            FROM users
+            ORDER BY date_joined DESC
+        """)
+        rows = cursor.fetchall()
+
+    # Convert to a list of dictionaries for easier template access
+    users = [
+        {
+            "id": row[0],
+            "username": row[1],
+            "email": row[2],
+            "first_name": row[3],
+            "last_name": row[4],
+            "phone": row[5],
+            "avatar": row[6],
+            "role": row[7],
+            "is_active": bool(row[8]),
+            "is_staff": bool(row[9]),
+            "date_joined": row[10],
+        }
+        for row in rows
+    ]
+
+    return render(request, "accounts/users_list.html", {"users": users})
