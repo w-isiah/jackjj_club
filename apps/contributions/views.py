@@ -195,6 +195,8 @@ def edit_contribution(request, contribution_id):
 
 
 
+
+
 import json
 from django.db import connection, transaction
 from django.http import JsonResponse
@@ -203,53 +205,50 @@ from django.views.decorators.http import require_POST
 @require_POST
 def approve_multiple_contributions(request):
     """
-    Approves multiple contributions using a raw SQL query.
-    Requires admin role and uses transaction to ensure data integrity.
+    Approves multiple contributions using raw SQL.
+    Requires admin role and ensures atomic transaction.
     """
-    user_role = request.session.get("role")
-    if user_role != "admin":
+    if request.session.get("role") != "admin":
         return JsonResponse({"error": "Permission denied"}, status=403)
 
     try:
-        # Use a more secure way to get list data from the frontend
-        # This handles both form-encoded and JSON data
-        if request.content_type == 'application/json':
-            body_unicode = request.body.decode('utf-8')
-            body_data = json.loads(body_unicode)
-            ids_to_approve = body_data.get("approved_ids", [])
+        # Parse contribution IDs from request
+        if request.content_type == "application/json":
+            data = json.loads(request.body.decode("utf-8"))
+            ids = data.get("approved_ids", [])
         else:
-            ids_to_approve = request.POST.getlist("approved_ids[]")
+            ids = request.POST.getlist("approved_ids[]")
 
-        if not ids_to_approve:
-            return JsonResponse({"error": "No contributions selected"}, status=400)
-        
-        # Convert IDs to integers to prevent SQL injection attempts
-        # This is a critical validation step
-        valid_ids = [int(id) for id in ids_to_approve if id.isdigit()]
-        
+        if not ids:
+            return JsonResponse({"error": "No contributions selected."}, status=400)
+
+        # Validate and sanitize IDs
+        try:
+            valid_ids = [int(i) for i in ids if str(i).isdigit()]
+        except ValueError:
+            return JsonResponse({"error": "Invalid contribution IDs."}, status=400)
+
         if not valid_ids:
-            return JsonResponse({"error": "Invalid contribution IDs provided."}, status=400)
+            return JsonResponse({"error": "No valid contribution IDs provided."}, status=400)
 
-        # Create a dynamic string of placeholders for the SQL query
-        placeholders = ', '.join(['%s'] * len(valid_ids))
-        
-        # Use a transaction to ensure either all updates succeed or all fail
+        # Build SQL query with placeholders
+        placeholders = ", ".join(["%s"] * len(valid_ids))
+
         with transaction.atomic():
             with connection.cursor() as cursor:
-                # The SQL query uses placeholders to safely pass parameters
                 query = f"UPDATE contributions SET approved = 1 WHERE id IN ({placeholders})"
                 cursor.execute(query, valid_ids)
-                
-                approved_count = cursor.rowcount  # Get the number of affected rows
-        
-        if approved_count > 0:
-            return JsonResponse({"message": f"{approved_count} contribution(s) approved successfully."})
-        else:
-            return JsonResponse({"message": "No contributions were approved. They may have been approved already."}, status=200)
+                count = cursor.rowcount
+
+        message = (
+            f"{count} contribution(s) approved successfully."
+            if count > 0 else "No contributions were approved. They may already be approved."
+        )
+        return JsonResponse({"message": message})
 
     except Exception as e:
-        # Rollback the transaction on any error
         return JsonResponse({"error": "An internal error occurred while processing your request."}, status=500)
+
 
 
 
