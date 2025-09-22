@@ -6,14 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Jack JJ Club{% endblock title %}</title>
 
-  <!-- Google Font -->
   <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,400i,700&display=fallback">
-  <!-- Font Awesome -->
   <link rel="stylesheet" href="{% static 'plugins/fontawesome-free/css/all.min.css' %}">
-  <!-- AdminLTE -->
   <link rel="stylesheet" href="{% static 'dist/css/adminlte.min.css' %}">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css">
 
-  <!-- Global fix for fixed navbar -->
   <style>
     .content-wrapper {
       padding-top: 20px;
@@ -30,7 +27,6 @@
 <body class="hold-transition layout-top-nav">
 <div class="wrapper">
 
-  <!-- Navbar -->
   <nav class="main-header navbar navbar-expand-md navbar-light navbar-white fixed-top">
     <div class="container">
       <a href="{% url 'index' %}" class="navbar-brand">
@@ -43,14 +39,12 @@
       </button>
 
       <div class="collapse navbar-collapse" id="navbarCollapse">
-        <!-- Left links -->
         <ul class="navbar-nav">
           <li class="nav-item"><a href="{% url 'index' %}" class="nav-link">Home</a></li>
-          <li class="nav-item"><a href="#" class="nav-link">About</a></li>
-          <li class="nav-item"><a href="#" class="nav-link">Contact</a></li>
+          <li class="nav-item"><a href="#" class="nav-link">Documentation</a></li>
+          
         </ul>
 
-        <!-- Search -->
         <form class="form-inline ml-3">
           <div class="input-group input-group-sm">
             <input class="form-control form-control-navbar" type="search" placeholder="Search">
@@ -60,9 +54,7 @@
           </div>
         </form>
 
-        <!-- Right links -->
         <ul class="navbar-nav ml-auto">
-          <!-- Notifications -->
           <li class="nav-item dropdown">
             <a class="nav-link" data-toggle="dropdown" href="#">
               <i class="far fa-bell"></i>
@@ -83,7 +75,6 @@
             </div>
           </li>
 
-          <!-- User Menu -->
           <li class="nav-item dropdown user-menu">
             <a href="#" class="nav-link dropdown-toggle" data-toggle="dropdown">
               {% if current_user and current_user.avatar %}
@@ -125,9 +116,6 @@
       </div>
     </div>
   </nav>
-  <!-- /.navbar -->
-
-  <!-- Content Wrapper -->
   <div class="content-wrapper">
     <div class="content">
       <div class="container-fluid py-3">
@@ -136,18 +124,25 @@
     </div>
   </div>
 
-  <!-- Footer -->
   <footer class="main-footer text-center">
     <strong>&copy; 2025 <a href="#">Jack JJ Club</a>.</strong> All rights reserved.
   </footer>
 </div>
-<!-- ./wrapper -->
-
-<!-- Scripts -->
 {% block scripts %}
 <script src="{% static 'plugins/jquery/jquery.min.js' %}"></script>
 <script src="{% static 'plugins/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
 <script src="{% static 'dist/js/adminlte.min.js' %}"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+
+{% if messages %}
+<script>
+    $(document).ready(function() {
+        {% for message in messages %}
+            toastr.{{ message.tags }}("{{ message|safe }}");
+        {% endfor %}
+    });
+</script>
+{% endif %}
 {% endblock scripts %}
 
 {% block extra_js %}{% endblock extra_js %}
