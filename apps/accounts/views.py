@@ -244,7 +244,7 @@ def edit_profile(request):
 def list_users(request):
     with connection.cursor() as cursor:
         cursor.execute("""
-            SELECT id, username, email, first_name, last_name, phone, avatar, role, is_active, is_staff, date_joined
+            SELECT id, member_id, username, email, first_name, last_name, phone, avatar, role, is_active, is_staff, date_joined
             FROM users
             ORDER BY date_joined DESC
         """)
@@ -254,18 +254,127 @@ def list_users(request):
     users = [
         {
             "id": row[0],
-            "username": row[1],
-            "email": row[2],
-            "first_name": row[3],
-            "last_name": row[4],
-            "phone": row[5],
-            "avatar": row[6],
-            "role": row[7],
-            "is_active": bool(row[8]),
-            "is_staff": bool(row[9]),
-            "date_joined": row[10],
+            "member_id": row[1],
+            "username": row[2],
+            "email": row[3],
+            "first_name": row[4],
+            "last_name": row[5],
+            "phone": row[6],
+            "avatar": row[7],
+            "role": row[8],
+            "is_active": bool(row[9]),
+            "is_staff": bool(row[10]),
+            "date_joined": row[11],
         }
         for row in rows
     ]
 
     return render(request, "accounts/users_list.html", {"users": users})
+
+
+
+
+
+
+
+
+
+
+
+import os
+from django.conf import settings
+from django.contrib import messages
+from django.shortcuts import render, redirect
+
+@login_required_custom
+def user_edit(request, user_id):
+    """ Edit a user including avatar """
+    with connection.cursor() as cursor:
+        cursor.execute("""
+            SELECT id, member_id, username, email, first_name, last_name, phone, role, is_active, avatar
+            FROM users WHERE id = %s
+        """, [user_id])
+        row = cursor.fetchone()
+
+    if not row:
+        messages.error(request, "User not found.")
+        return redirect("users_list")
+
+    user = {
+        "id": row[0],
+        "member_id": row[1],
+        "username": row[2],
+        "email": row[3],
+        "first_name": row[4],
+        "last_name": row[5],
+        "phone": row[6],
+        "role": row[7],
+        "is_active": row[8],
+        "avatar": row[9],
+    }
+
+    if request.method == "POST":
+        member_id = request.POST.get("member_id")
+        username = request.POST.get("username")
+        email = request.POST.get("email")
+        first_name = request.POST.get("first_name")
+        last_name = request.POST.get("last_name")
+        phone = request.POST.get("phone")
+        role = request.POST.get("role")
+        is_active = 1 if request.POST.get("is_active") == "on" else 0
+
+        avatar = request.FILES.get("avatar")
+        avatar_path = None
+        if avatar:
+            # Ensure avatars directory exists
+            avatar_dir = os.path.join(settings.MEDIA_ROOT, "avatars")
+            os.makedirs(avatar_dir, exist_ok=True)
+
+            # Save file with unique name
+            avatar_path = f"avatars/{user_id}_{avatar.name}"
+            full_path = os.path.join(settings.MEDIA_ROOT, avatar_path)
+
+            with open(full_path, "wb+") as dest:
+                for chunk in avatar.chunks():
+                    dest.write(chunk)
+        else:
+            avatar_path = user["avatar"]  # keep old avatar if no new upload
+
+        # Update user record
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                UPDATE users 
+                SET member_id=%s, username=%s, email=%s, first_name=%s, last_name=%s,
+                    phone=%s, role=%s, is_active=%s, avatar=%s
+                WHERE id=%s
+            """, [member_id, username, email, first_name, last_name, phone, role, is_active, avatar_path, user_id])
+
+        messages.success(request, "User updated successfully.")
+        return redirect("users_list")
+
+    return render(request, "accounts/edit_user.html", {"user": user})
+
+
+
+
+@login_required_custom
+def delete_user(request, user_id):
+    """ Delete a user """
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT id FROM users WHERE id=%s", [user_id])
+        row = cursor.fetchone()
+
+    if not row:
+        messages.error(request, "User not found.")
+        return redirect("users_list")
+
+    if request.method == "POST":
+        with connection.cursor() as cursor:
+            cursor.execute("DELETE FROM users WHERE id=%s", [user_id])
+        messages.success(request, "User deleted successfully.")
+        return redirect("uses_list")
+
+    return render(request, "accounts/confirm_delete.html", {"user_id": user_id})
+
+
+

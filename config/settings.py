@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "apps.dyn_dt",
     "apps.dyn_api",
     "apps.charts",
+    "apps.contributions",
 
     # REST Framework
     "rest_framework",
@@ -89,6 +90,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "apps.accounts.context_processors.user_context",
                 "django.template.context_processors.media",
+                "apps.contributions.context_processors.unapproved_contributions_count",
 
             ],
         },
