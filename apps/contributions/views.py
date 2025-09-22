@@ -191,30 +191,68 @@ def edit_contribution(request, contribution_id):
 
 
 
-@login_required
-def approve_contribution(request, contribution_id):
+
+
+
+
+import json
+from django.db import connection, transaction
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+
+@require_POST
+def approve_multiple_contributions(request):
     """
-    Approve a single contribution. Only accessible by admins.
+    Approves multiple contributions using a raw SQL query.
+    Requires admin role and uses transaction to ensure data integrity.
     """
     user_role = request.session.get("role")
-
     if user_role != "admin":
-        messages.error(request, "You do not have permission to approve contributions.")
-        return redirect("contributions")
+        return JsonResponse({"error": "Permission denied"}, status=403)
 
-    with connection.cursor() as cursor:
-        # Check if the contribution exists
-        cursor.execute("SELECT id FROM contributions WHERE id = %s", [contribution_id])
-        contribution = cursor.fetchone()
-        if not contribution:
-            messages.error(request, "Contribution not found.")
-            return redirect("contributions")
+    try:
+        # Use a more secure way to get list data from the frontend
+        # This handles both form-encoded and JSON data
+        if request.content_type == 'application/json':
+            body_unicode = request.body.decode('utf-8')
+            body_data = json.loads(body_unicode)
+            ids_to_approve = body_data.get("approved_ids", [])
+        else:
+            ids_to_approve = request.POST.getlist("approved_ids[]")
 
-        # Approve the contribution
-        cursor.execute("UPDATE contributions SET approved = 1 WHERE id = %s", [contribution_id])
-        messages.success(request, "Contribution approved successfully.")
+        if not ids_to_approve:
+            return JsonResponse({"error": "No contributions selected"}, status=400)
+        
+        # Convert IDs to integers to prevent SQL injection attempts
+        # This is a critical validation step
+        valid_ids = [int(id) for id in ids_to_approve if id.isdigit()]
+        
+        if not valid_ids:
+            return JsonResponse({"error": "Invalid contribution IDs provided."}, status=400)
 
-    return redirect("contributions")
+        # Create a dynamic string of placeholders for the SQL query
+        placeholders = ', '.join(['%s'] * len(valid_ids))
+        
+        # Use a transaction to ensure either all updates succeed or all fail
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                # The SQL query uses placeholders to safely pass parameters
+                query = f"UPDATE contributions SET approved = 1 WHERE id IN ({placeholders})"
+                cursor.execute(query, valid_ids)
+                
+                approved_count = cursor.rowcount  # Get the number of affected rows
+        
+        if approved_count > 0:
+            return JsonResponse({"message": f"{approved_count} contribution(s) approved successfully."})
+        else:
+            return JsonResponse({"message": "No contributions were approved. They may have been approved already."}, status=200)
+
+    except Exception as e:
+        # Rollback the transaction on any error
+        return JsonResponse({"error": "An internal error occurred while processing your request."}, status=500)
+
+
+
 
 
 

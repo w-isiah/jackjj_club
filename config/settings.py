@@ -35,6 +35,7 @@ if RENDER_EXTERNAL_HOSTNAME:
 # -------------------------
 INSTALLED_APPS = [
     "django.contrib.admin",
+    'django.contrib.humanize',  # <--- Add this line
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",

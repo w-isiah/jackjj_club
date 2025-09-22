@@ -1,8 +1,14 @@
 {% extends "layouts/base.html" %}
 {% load static %}
-
+{% load humanize %}
 
 {% block title %}Contributions{% endblock title %}
+
+{% block extra_css %}
+    <link rel="stylesheet" href="{% static 'plugins/datatables-bs4/css/dataTables.bootstrap4.min.css' %}">
+    <link rel="stylesheet" href="{% static 'plugins/datatables-responsive/css/responsive.bootstrap4.min.css' %}">
+    <link rel="stylesheet" href="{% static 'plugins/datatables-fixedcolumns/css/fixedColumns.bootstrap4.min.css' %}">
+{% endblock extra_css %}
 
 {% block content %}
 <div class="content-wrapper">
@@ -33,9 +39,8 @@
             </div>
 
             <div class="card-body">
-                <form id="approval-form" method="post" action="{% url 'contributions' %}">
-                    {% csrf_token %}
-                    <table id="contributionsTable" class="table table-bordered table-striped">
+                <div class="table-responsive">
+                    <table id="contributionsTable" class="table table-bordered table-striped" style="width:100%;">
                         <thead>
                             <tr>
                                 {% if request.session.role == "admin" %}
@@ -69,7 +74,7 @@
                                 <td>{{ forloop.counter }}</td>
                                 <td>{{ c.member_id }}</td>
                                 <td>{{ c.first_name }} {{ c.last_name }}</td>
-                                <td>UGX {{ c.amount }}</td>
+                                <td>UGX {{ c.amount|intcomma }}</td>
                                 <td>{{ c.type|title }}</td>
                                 <td>{{ c.contribution_date|date:"F d, Y" }}</td>
                                 <td>{{ c.description }}</td>
@@ -118,7 +123,7 @@
                             {% endfor %}
                         </tbody>
                     </table>
-                </form>
+                </div>
             </div>
         </div>
     </section>
@@ -129,34 +134,68 @@
 <script src="{% static 'plugins/datatables/jquery.dataTables.min.js' %}"></script>
 <script src="{% static 'plugins/datatables-bs4/js/dataTables.bootstrap4.min.js' %}"></script>
 <script src="{% static 'plugins/datatables-responsive/js/dataTables.responsive.min.js' %}"></script>
+<script src="{% static 'plugins/datatables-fixedcolumns/js/dataTables.fixedColumns.min.js' %}"></script>
+
 <script>
-    $(document).ready(function() {
-        // Initialize DataTable
-        $("#contributionsTable").DataTable({
-            "responsive": true,
-            "lengthChange": true,
-            "autoWidth": false,
-            "ordering": true,
-            "pageLength": 10,
-        });
+$(document).ready(function() {
+    // Initialize DataTable with FixedColumns
+    $("#contributionsTable").DataTable({
+        "responsive": true,
+        "lengthChange": true,
+        "autoWidth": false,
+        "ordering": true,
+        "pageLength": 10,
+        "scrollX": true,
+        "fixedColumns": {
+            start: {% if request.session.role == "admin" %}4{% else %}3{% endif %},
+            end: 1
+        }
+    });
 
-        // Handle "Select All" checkbox
-        $('#select-all').on('click', function(){
-            $('input[name="approved_ids"]').prop('checked', this.checked);
-        });
+    // Handle "Select All" checkbox
+    $('#select-all').on('click', function(){
+        // Get the DataTables API instance
+        const table = $('#contributionsTable').DataTable();
+        // Checkboxes in the current page
+        table.rows({ page: 'current' }).nodes().to$().find('input[type="checkbox"]').prop('checked', this.checked);
+    });
 
-        // Handle "Approve Selected" button click
-        $('#approve-button').on('click', function(e){
-            e.preventDefault();
-            const selectedCount = $('input[name="approved_ids"]:checked').length;
-            if (selectedCount > 0) {
-                if (confirm(`Are you sure you want to approve ${selectedCount} contribution(s)?`)) {
-                    $('#approval-form').submit();
-                }
-            } else {
-                alert("Please select at least one contribution to approve.");
+    // Handle "Approve Selected" button click
+    $('#approve-button').on('click', function(e){
+        e.preventDefault(); // Prevent the default button click action
+
+        const selected = $('#contributionsTable input[name="approved_ids"]:checked').map(function() {
+            return $(this).val();
+        }).get();
+
+        if (selected.length === 0) {
+            alert("Please select at least one contribution to approve.");
+            return;
+        }
+
+        if (!confirm(`Are you sure you want to approve ${selected.length} contribution(s)?`)) {
+            return;
+        }
+
+        // Send an AJAX request to the Django backend
+        $.ajax({
+            url: "{% url 'contributions' %}", // Or a dedicated URL for the action
+            type: "POST",
+            data: {
+                // Get the CSRF token from the meta tag
+                'csrfmiddlewaretoken': $('input[name="csrfmiddlewaretoken"]').val(),
+                'approved_ids': selected
+            },
+            success: function(response) {
+                alert(response.message);
+                // Reload the page to show the updated approval status
+                location.reload(); 
+            },
+            error: function(xhr) {
+                alert(xhr.responseJSON?.error || "An error occurred while approving contributions.");
             }
         });
     });
+});
 </script>
 {% endblock extra_js %}
