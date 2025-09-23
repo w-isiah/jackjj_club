@@ -45,10 +45,12 @@ INSTALLED_APPS = [
     # Project apps
     "apps.pages",
     "apps.accounts",
+    "apps.withdrawals",
     "apps.dyn_dt",
     "apps.dyn_api",
     "apps.charts",
     "apps.contributions",
+    "apps.investments",
 
     # REST Framework
     "rest_framework",
@@ -158,6 +160,7 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # LOGIN / EMAIL
 # -------------------------
 LOGIN_REDIRECT_URL = "/"
+LOGIN_URL = '/accounts/login/'
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 # -------------------------

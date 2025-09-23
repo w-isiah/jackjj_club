@@ -246,7 +246,7 @@ def list_users(request):
         cursor.execute("""
             SELECT id, member_id, username, email, first_name, last_name, phone, avatar, role, is_active, is_staff, date_joined
             FROM users
-            WHERE role != 'super_admin'
+            #WHERE role != 'super_admin'
             ORDER BY date_joined DESC
         """)
         rows = cursor.fetchall()
