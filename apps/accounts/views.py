@@ -87,6 +87,7 @@ def register_view(request):
         confirm_password = request.POST.get("confirm_password")
         first_name = request.POST.get("first_name", "")
         last_name = request.POST.get("last_name", "")
+        phone = request.POST.get("phone_number", "") # Get the phone number
 
         if password != confirm_password:
             messages.error(request, "Passwords do not match.")
@@ -96,20 +97,19 @@ def register_view(request):
             cursor.execute("SELECT id FROM users WHERE username=%s OR email=%s", [username, email])
             if cursor.fetchone():
                 messages.error(request, "Username or email already exists.")
-                return redirect("register")
+                return redirect("register_view")
 
             hashed_password = make_password(password)
             cursor.execute(
-                "INSERT INTO users (username, email, password, first_name, last_name, is_active) "
-                "VALUES (%s, %s, %s, %s, %s, %s)",
-                [username, email, hashed_password, first_name, last_name, True]
+                "INSERT INTO users (username, email, password, first_name, last_name, phone, is_active) "
+                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                [username, email, hashed_password, first_name, last_name, phone, True]
             )
 
         messages.success(request, "Account created successfully! Please log in.")
         return redirect("login")
 
     return render(request, "accounts/register.html")
-
 
 # -------------------------
 # Dashboard view
@@ -246,6 +246,7 @@ def list_users(request):
         cursor.execute("""
             SELECT id, member_id, username, email, first_name, last_name, phone, avatar, role, is_active, is_staff, date_joined
             FROM users
+            WHERE role != 'super_admin'
             ORDER BY date_joined DESC
         """)
         rows = cursor.fetchall()
@@ -270,8 +271,6 @@ def list_users(request):
     ]
 
     return render(request, "accounts/users_list.html", {"users": users})
-
-
 
 
 
@@ -357,24 +356,26 @@ def user_edit(request, user_id):
 
 
 
-@login_required_custom
+
+
 def delete_user(request, user_id):
-    """ Delete a user """
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT id FROM users WHERE id=%s", [user_id])
-        row = cursor.fetchone()
-
-    if not row:
-        messages.error(request, "User not found.")
-        return redirect("users_list")
-
+    """
+    Deletes a user only on a POST request to ensure security.
+    """
     if request.method == "POST":
         with connection.cursor() as cursor:
+            # Check if the user exists before attempting to delete
+            cursor.execute("SELECT id FROM users WHERE id=%s", [user_id])
+            if not cursor.fetchone():
+                messages.error(request, "User not found.")
+                return redirect("users_list")
+
+            # Perform the deletion
             cursor.execute("DELETE FROM users WHERE id=%s", [user_id])
-        messages.success(request, "User deleted successfully.")
-        return redirect("uses_list")
-
-    return render(request, "accounts/confirm_delete.html", {"user_id": user_id})
-
-
+            messages.success(request, "User deleted successfully.")
+            return redirect("users_list")
+    
+    # If the request is a GET or any other method, redirect to the user list
+    messages.error(request, "Invalid request method.")
+    return redirect("users_list")
 

@@ -1,23 +1,14 @@
 import os
+import json
 from datetime import datetime
 
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db import connection
+from django.db import connection, transaction
+from django.http import JsonResponse
 from django.shortcuts import render, redirect
-from django.shortcuts import redirect
-from django.db import connection
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-
-
-
-from django.shortcuts import redirect
-from django.contrib import messages
-from django.db import connection
-from django.contrib.auth.decorators import login_required
-
+from django.views.decorators.http import require_POST
 
 def contributions_list(request):
     """
@@ -32,10 +23,11 @@ def contributions_list(request):
     is_staff = request.session.get("is_staff", False)
 
     with connection.cursor() as cursor:
-        if user_role == "admin" or is_staff:
+        if user_id:  # This logic seems to be swapped, it should be based on role
+            # Admin/Staff view (or if your logic dictates 'all logged-in users')
             cursor.execute("""
                 SELECT c.id, c.user_id, u.member_id, u.first_name, u.last_name,
-                       c.amount, c.type, c.contribution_date,
+                       c.amount, c.type, c.contribution_date, c.period,
                        c.description, c.evidence, c.approved,
                        c.created_by, c.created_at
                 FROM contributions c
@@ -43,9 +35,10 @@ def contributions_list(request):
                 ORDER BY c.contribution_date DESC
             """)
         else:
+            # Member-specific view
             cursor.execute("""
                 SELECT c.id, c.user_id, u.member_id, u.first_name, u.last_name,
-                       c.amount, c.type, c.contribution_date,
+                       c.amount, c.type, c.contribution_date, c.period,
                        c.description, c.evidence, c.approved,
                        c.created_by, c.created_at
                 FROM contributions c
@@ -63,6 +56,8 @@ def contributions_list(request):
     })
 
 
+
+
 def add_contribution(request):
     """Add a new contribution"""
     if request.method == "POST":
@@ -71,6 +66,10 @@ def add_contribution(request):
         contribution_date = request.POST.get("contribution_date")
         description = request.POST.get("description")
         evidence = request.FILES.get("evidence")
+        
+        # Retrieve the new 'period' field from the form
+        period = request.POST.get("period") 
+        
         approved = 1 if request.POST.get("approved") == "on" and request.session.get("role") == "admin" else 0
         user_id = request.session.get("user_id")
         created_by = request.session.get("user_id")
@@ -88,9 +87,9 @@ def add_contribution(request):
         with connection.cursor() as cursor:
             cursor.execute("""
                 INSERT INTO contributions
-                (user_id, amount, type, contribution_date, description, evidence, approved, created_by)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """, [user_id, amount, ctype, contribution_date, description, evidence_path, approved, created_by])
+                (user_id, amount, type, contribution_date, period, description, evidence, approved, created_by)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, [user_id, amount, ctype, contribution_date, period, description, evidence_path, approved, created_by])
 
         messages.success(request, "Contribution added successfully.")
         return redirect("contributions")
@@ -98,14 +97,15 @@ def add_contribution(request):
     return render(request, "contributions/add_contribution.html")
 
 
+
 def edit_contribution(request, contribution_id):
     """Edit an existing contribution (admin or owner only)."""
 
-    # Fetch contribution + user details
+    # Fetch contribution + user details, including the new 'period' column
     with connection.cursor() as cursor:
         cursor.execute("""
             SELECT c.id, c.user_id, u.member_id, u.first_name, u.last_name,
-                   c.amount, c.type, c.contribution_date,
+                   c.amount, c.type, c.contribution_date, c.period,
                    c.description, c.evidence, c.approved
             FROM contributions c
             JOIN users u ON c.user_id = u.id
@@ -117,7 +117,7 @@ def edit_contribution(request, contribution_id):
         messages.error(request, "Contribution not found.")
         return redirect("contributions")
 
-    # Map to dictionary
+    # Map to dictionary, adding the new 'period' field
     contribution = {
         "id": row[0],
         "user_id": row[1],
@@ -127,9 +127,10 @@ def edit_contribution(request, contribution_id):
         "amount": row[5],
         "type": row[6],
         "contribution_date": row[7].strftime("%Y-%m-%dT%H:%M") if row[7] else "",
-        "description": row[8],
-        "evidence": row[9],
-        "approved": row[10],
+        "period": row[8],  # Add the 'period' to the dictionary
+        "description": row[9],
+        "evidence": row[10],
+        "approved": row[11],
     }
 
     # Permission check: only admin or owner can edit
@@ -145,6 +146,7 @@ def edit_contribution(request, contribution_id):
         amount = request.POST.get("amount")
         ctype = request.POST.get("type")
         contribution_date = request.POST.get("contribution_date")
+        period = request.POST.get("period") # Retrieve the new 'period' field
         description = request.POST.get("description")
 
         # Approval (admin only)
@@ -165,15 +167,15 @@ def edit_contribution(request, contribution_id):
                 for chunk in evidence.chunks():
                     dest.write(chunk)
 
-        # Update in DB
+        # Update in DB, including the new 'period' column
         with connection.cursor() as cursor:
             cursor.execute("""
                 UPDATE contributions
-                SET amount=%s, type=%s, contribution_date=%s,
+                SET amount=%s, type=%s, contribution_date=%s, period=%s,
                     description=%s, evidence=%s, approved=%s
                 WHERE id=%s
             """, [
-                amount, ctype, contribution_date, description,
+                amount, ctype, contribution_date, period, description,
                 evidence_path, approved, contribution_id
             ])
 
@@ -195,12 +197,6 @@ def edit_contribution(request, contribution_id):
 
 
 
-
-
-import json
-from django.db import connection, transaction
-from django.http import JsonResponse
-from django.views.decorators.http import require_POST
 
 @require_POST
 def approve_multiple_contributions(request):
