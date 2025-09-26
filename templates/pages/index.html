@@ -29,10 +29,11 @@
     <section class="content">
         <div class="container-fluid">
             <div class="row">
+
                 <div class="col-lg-3 col-6">
                     <div class="small-box bg-info">
                         <div class="inner">
-                            <h3>{{ total_users }}</h3>
+                            <h3>{{ total_users|default:0 }}</h3>
                             <p>Total Members</p>
                         </div>
                         <div class="icon">
@@ -44,10 +45,28 @@
                     </div>
                 </div>
 
+                      <div class="col-lg-3 col-6">
+                    <div class="small-box bg-success">
+                        <div class="inner">
+                            <h4>UGX{{ total_contributions_amount|intcomma|default:0 }}</h4>
+                            <p>Contributions (Pending: {{ unapproved_contributions_count|default:0 }})</p>
+                        </div>
+                        <div class="icon">
+                            <i class="ion ion-cash"></i>
+                        </div>
+                        <a href="{% url 'contributions' %}" class="small-box-footer">
+                            More info <i class="fas fa-arrow-circle-right"></i>
+                        </a>
+                    </div>
+                </div>
+
+
+                {% if request.session.role == 'admin' or request.session.role == 'super_admin' %}
+
                 <div class="col-lg-3 col-6">
                     <div class="small-box bg-primary">
                         <div class="inner">
-                            <h3>{{ total_investments|intcomma }}</h3>
+                            <h4>UGX{{ total_investments|intcomma|default:0 }}</h4>
                             <p>Total Investments</p>
                         </div>
                         <div class="icon">
@@ -62,14 +81,44 @@
                 <div class="col-lg-3 col-6">
                     <div class="small-box bg-secondary">
                         <div class="inner">
-                            <h3>{{ total_signatures|intcomma }}</h3>
+                            <h3>{{ total_signatures|intcomma|default:0 }}</h3>
                             <p>Investment Signatures</p>
                         </div>
                         <div class="icon">
                             <i class="ion ion-clipboard"></i>
                         </div>
                         <a href="{% url 'list_investment_signatures' %}" class="small-box-footer">
+                            Audit Log <i class="fas fa-arrow-circle-right"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-success">
+                        <div class="inner">
+                            <h4>UGX{{ total_loans_amount|intcomma|default:0 }}</h4>
+                            <p>Total Loans</p>
+                        </div>
+                        <div class="icon">
+                            <i class="ion ion-cash"></i>
+                        </div>
+                        <a href="{% url 'list_loans' %}" class="small-box-footer">
                             More info <i class="fas fa-arrow-circle-right"></i>
+                        </a>
+                    </div>
+                </div>
+
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-primary">
+                        <div class="inner">
+                            <h3>{{ total_loan_signatures|default:0 }}</h3>
+                            <p>Loan Signatures</p>
+                        </div>
+                        <div class="icon">
+                            <i class="ion ion-stats-bars"></i>
+                        </div>
+                        <a href="{% url 'list_loan_signatures' %}" class="small-box-footer">
+                            Audit Log <i class="fas fa-arrow-circle-right"></i>
                         </a>
                     </div>
                 </div>
@@ -77,7 +126,7 @@
                 <div class="col-lg-3 col-6">
                     <div class="small-box bg-warning">
                         <div class="inner">
-                            <h3>{{ total_withdrawals|intcomma }}</h3>
+                            <h4>UGX{{ total_withdrawals|intcomma|default:0 }}</h4>
                             <p>Total Withdrawals</p>
                         </div>
                         <div class="icon">
@@ -92,53 +141,20 @@
                 <div class="col-lg-3 col-6">
                     <div class="small-box bg-danger">
                         <div class="inner">
-                            <h3>{{ total_withdrawal_signatures|intcomma }}</h3>
+                            <h3>{{ total_withdrawal_signatures|intcomma|default:0 }}</h3>
                             <p>Withdrawal Signatures</p>
                         </div>
                         <div class="icon">
                             <i class="ion ion-clipboard"></i>
                         </div>
                         <a href="{% url 'list_withdrawals_signatures' %}" class="small-box-footer">
-                            More info <i class="fas fa-arrow-circle-right"></i>
+                            Audit Log <i class="fas fa-arrow-circle-right"></i>
                         </a>
                     </div>
                 </div>
 
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-success">
-                        <div class="inner">
-                            <h4>UGX{{ total_contributions_amount|intcomma }}</h4>
-                            <p>Contributions, pending {{ unapproved_contributions_count }}</p>
-                        </div>
-                        <div class="icon">
-                            <i class="ion ion-cash"></i>
-                        </div>
-                        <a href="{% url 'contributions' %}" class="small-box-footer">
-                            More info <i class="fas fa-arrow-circle-right"></i>
-                        </a>
-                    </div>
-                </div>
-
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-success">
-                        <div class="inner">
-                            <h4>UGX</h4>
-                            <p>Loans</p>
-                        </div>
-                        <div class="icon">
-                            <i class="ion ion-cash"></i>
-                        </div>
-                        <a href="{% url 'contributions' %}" class="small-box-footer">
-                            More info <i class="fas fa-arrow-circle-right"></i>
-                        </a>
-                    </div>
-                </div>
-
-
-            </div>
-
-            <div class="row">
-                <section class="col-lg-12">
+          
+                <div class="col-lg-12">
                     <div class="card">
                         <div class="card-header">
                             <h3 class="card-title">Recent Transactions</h3>
@@ -174,8 +190,10 @@
                             </div>
                         </div>
                     </div>
-                </section>
-            </div>
+                </div>
+
+                {% endif %}
+                </div>
         </div>
     </section>
 </div>

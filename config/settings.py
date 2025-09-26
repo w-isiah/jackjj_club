@@ -44,6 +44,7 @@ INSTALLED_APPS = [
 
     # Project apps
     "apps.pages",
+    "apps.loans",
     "apps.accounts",
     "apps.withdrawals",
     "apps.dyn_dt",

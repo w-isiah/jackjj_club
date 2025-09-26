@@ -217,10 +217,10 @@ def list_investment_signatures(request):
     Lists all investment signatures, showing the signatory's details.
     This view is for admins only.
     """
-    user_role = request.session.get("role")
-    if user_role:# not in ['admin', 'super_admin','member','Member']
-        messages.error(request, "You do not have permission to view this page.")
-        return redirect('list_investments')
+    #user_role = request.session.get("role")
+    #if user_role:# not in ['admin', 'super_admin','member','Member']
+    #    messages.error(request, "You do not have permission to view this page.")
+    #    return redirect('list_investments')
 
     signatures = []
     with connection.cursor() as cursor:

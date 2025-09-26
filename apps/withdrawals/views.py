@@ -206,10 +206,10 @@ def list_withdrawals_signatures(request):
     Lists all withdrawal signatures, showing the signatory's details.
     This view is for admins only.
     """
-    user_role = request.session.get("role")
-    if user_role:# not in ['admin', 'super_admin']
-        messages.error(request, "You do not have permission to view this page.")
-        return redirect('list_withdrawals')
+    #user_role = request.session.get("role")
+    #if user_role:# not in ['admin', 'super_admin']
+    #    messages.error(request, "You do not have permission to view this page.")
+    #    return redirect('list_withdrawals')
 
     signatures = []
     with connection.cursor() as cursor:
